@@ -15,6 +15,8 @@ sys.path.append("./lib/")
 from utils import compute_scaling, reduce_mem_usage
 from evaluation import WRMSSEEvaluator
 
+EPS = 1e-16
+
 ###########################################################################################
 # logger setting
 ###########################################################################################
@@ -28,7 +30,6 @@ else:
 ###########################################################################################
 # data prep
 ###########################################################################################
-
 weights_level12 = pd.read_parquet("./input/weights_level12.parquet")
 scaling_input = pd.read_parquet("./input/scaling_input.parquet")
 scales = compute_scaling(scaling_input, agg_columns=["store_id","item_id"]).rename({"q":"s"}, axis=1)
@@ -36,12 +37,13 @@ scales = compute_scaling(scaling_input, agg_columns=["store_id","item_id"]).rena
 # validation periods
 valid_periods = [(pd.to_datetime("2015-04-25"), pd.to_datetime("2015-05-22")),
                  (pd.to_datetime("2015-05-23"), pd.to_datetime("2015-06-19")),
-                 (pd.to_datetime("2016-02-29"), pd.to_datetime("2016-03-27")),
-                 (pd.to_datetime("2016-03-28"), pd.to_datetime("2016-04-24"))]
+                 #(pd.to_datetime("2016-02-29"), pd.to_datetime("2016-03-27")),
+                 #(pd.to_datetime("2016-03-28"), pd.to_datetime("2016-04-24"))
+                ]
 
 # precomputed (features) models
 precomputed_models = list()
-for i in range(4):
+for i in range(2):
     with open(f"./precomputed/model{i}.pickle", "rb") as handler: 
         model = pickle.load(handler)
         precomputed_models.append(model)
@@ -53,12 +55,17 @@ for i in range(4):
 
 default_model_params = {
     'objective':'tweedie',
+    'boost_from_average':False,
     'metric':'None',
     'num_iterations':100000,
     'early_stopping_rounds':200,
-    'max_bin': 127,
-    'bin_construct_sample_cnt':6000000,
-    'learning_rate': 0.05, 
+    'num_leaves':2**10-1,
+    'min_data_in_leaf':2**11-1,
+    #'max_bin': 127,
+    'bin_construct_sample_cnt':1000000,
+    'learning_rate': 0.05,
+    'feature_fraction': 0.9,
+    'bagging_fraction':0.7,
     'bagging_freq':1,
     'lambda_l2':0.1,
     'seed':7,
@@ -66,12 +73,12 @@ default_model_params = {
 
 def objective(trial):
     sampled_params = {
-        "tweedie_variance_power": trial.suggest_discrete_uniform("tweedie_variance_power", 1.0, 1.5, 0.1),
-        "boost_from_average" : trial.suggest_categorical("boost_from_average", [True, False]),
-        "num_leaves": 2**(trial.suggest_int("num_leaves", 5, 12)) - 1,
-        "min_data_in_leaf": 2**(trial.suggest_int("min_data_in_leaf", 5, 13)) - 1,
-        "feature_fraction": trial.suggest_discrete_uniform("feature_fraction", 0.5, 1.0, 0.1),
-        "bagging_fraction": trial.suggest_discrete_uniform("bagging_fraction", 0.5, 1.0, 0.1),
+        "tweedie_variance_power": trial.suggest_uniform("tweedie_variance_power", 1.0, 1.6),
+        #"boost_from_average" : trial.suggest_categorical("boost_from_average", [True, False]),
+        #"num_leaves": 2**(trial.suggest_int("num_leaves", 7, 12)) - 1,
+        #"min_data_in_leaf": 2**(trial.suggest_int("min_data_in_leaf", 5, 13)) - 1,
+        #"feature_fraction": trial.suggest_discrete_uniform("feature_fraction", 0.5, 1.0, 0.1),
+        #"bagging_fraction": trial.suggest_discrete_uniform("bagging_fraction", 0.5, 1.0, 0.1),
     }
     model_params = {**default_model_params, **sampled_params}
     
@@ -114,7 +121,7 @@ def objective(trial):
     best_iteration = np.mean(best_iterations)
     error = np.mean(errors)     
 
-    logger.write(f"{trial.number};{model_params};{best_iterations};{errors};{best_iterations};{error}\n")
+    logger.write(f"{trial.number};{model_params};{best_iterations};{errors};{best_iteration};{error}\n")
     logger.flush()
     
     return error
@@ -122,7 +129,9 @@ def objective(trial):
 ###########################################################################################
 # study definition
 ###########################################################################################
-
-study = optuna.create_study(direction='minimize')
-study.optimize(objective, n_trials=10000)
+search_space = {'tweedie_variance_power': [1.0, 1.1, 1.2, 1.3, 1.4, 1.5],
+                #'boost_from_average':[True, False], 
+               }
+study = optuna.create_study(direction='minimize', sampler=optuna.samplers.GridSampler(search_space))
+study.optimize(objective, n_trials=6)
 logger.close()
