@@ -42,3 +42,14 @@ def compute_scaling(data, cut_date=None, agg_columns="ts_id"):
                .apply(lambda x: np.sqrt(np.nanmean(x.diff(1)**2)))
                .reset_index())
     return scaling
+
+
+def find_out_of_stock(df, threshold=28):
+    df = df.copy()
+    df["no_stock"] = 0
+    zero_mask = (df.q == 0)
+    transition_mask = (zero_mask != zero_mask.shift(1))
+    zero_sequences = transition_mask.cumsum()[zero_mask]
+    idx = zero_sequences[zero_sequences.map(zero_sequences.value_counts()) >= threshold].index 
+    df.loc[idx, "no_stock"] = 1
+    return df
