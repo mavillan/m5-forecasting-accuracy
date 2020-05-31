@@ -136,7 +136,8 @@ class WRMSSEEvaluator(object):
                      .eval("weight * (sqrt(mse)/s)")
                      .sum())
             errors_by_level.append(error)
-        
+            
+        self.errors_by_level = errors_by_level
         return np.mean(errors_by_level)
     
     def evaluate(self, ypred, dtrain):
