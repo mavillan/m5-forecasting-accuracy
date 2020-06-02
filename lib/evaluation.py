@@ -2,18 +2,18 @@ import numpy as np
 import pandas as pd
 
 ts_id_columns_by_level = {
-    1: (),
-    2: ("state_id"),
-    3: ("store_id"),
-    4: ("cat_id"),
-    5: ("dept_id"),
-    6: ("state_id", "cat_id"),
-    7: ("state_id", "dept_id"),
-    8: ("store_id", "cat_id"),
-    9: ("store_id", "dept_id"),
-    10: ("item_id"),
-    11: ("item_id", "state_id"),
-    12: ("item_id", "store_id")
+    1: [],
+    2: ["state_id"],
+    3: ["store_id"],
+    4: ["cat_id"],
+    5: ["dept_id"],
+    6: ["state_id", "cat_id"],
+    7: ["state_id", "dept_id"],
+    8: ["store_id", "cat_id"],
+    9: ["store_id", "dept_id"],
+    10: ["item_id"],
+    11: ["item_id", "state_id"],
+    12: ["item_id", "store_id"]
 }
 
 scales_by_level = {
@@ -123,7 +123,7 @@ class WRMSSEEvaluator(object):
             scales_dataframe = scales_by_level[level]
             weights_dataframe = weights_by_level[level]
             error = (valid_dataframe
-                     .groupby(["ds"]+list(ts_id_columns))s[["y","ypred"]]
+                     .groupby(["ds"]+ts_id_columns)[["y","ypred"]]
                      .sum()
                      .reset_index()
                      .assign(sq_error = lambda x: x.eval("(y-ypred)**2"))
@@ -135,10 +135,10 @@ class WRMSSEEvaluator(object):
                      .assign(weight = lambda x: x.weight/x.weight.sum())
                      .eval("weight * (sqrt(mse)/s)")
                      .sum())
-            errors_by_level[ts_id_columns] = error
+            errors_by_level[tuple(ts_id_columns)] = error
             
         self.errors_by_level = errors_by_level
-        return np.mean(errors_by_level.values())
+        return np.mean(list(errors_by_level.values()))
     
     def evaluate(self, ypred, dtrain):
         metric = self._evaluate(ypred)
@@ -152,4 +152,3 @@ class Evaluator(object):
     
     def evaluate(self, ypred, dtrain):
         return [self.eval1.evaluate(ypred, dtrain), self.eval2.evaluate(ypred, dtrain)]
-        
