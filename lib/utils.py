@@ -1,6 +1,21 @@
 import numpy as np
 import pandas as pd
 
+ts_id_columns_by_level = {
+    1: [],
+    2: ["state_id"],
+    3: ["store_id"],
+    4: ["cat_id"],
+    5: ["dept_id"],
+    6: ["state_id", "cat_id"],
+    7: ["state_id", "dept_id"],
+    8: ["store_id", "cat_id"],
+    9: ["store_id", "dept_id"],
+    10: ["item_id"],
+    11: ["item_id", "state_id"],
+    12: ["item_id", "store_id"]
+}
+
 def reduce_mem_usage(df, verbose=False):
     numerics = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
     start_mem = df.memory_usage().sum() / 1024**2    
@@ -42,6 +57,32 @@ def compute_scaling(data, cut_date=None, agg_columns="ts_id"):
                .apply(lambda x: np.sqrt(np.nanmean(x.diff(1)**2)))
                .reset_index())
     return scaling
+
+
+def compute_weights(weighting_input, start_date, level=12):
+    if level==1:
+        return None
+    
+    left_date = start_date - pd.DateOffset(days=28)
+    right_date = start_date - pd.DateOffset(days=1)
+
+    ts_id_columns = ts_id_columns_by_level[level]
+    weights_df = (weighting_input
+                 .query("@left_date <= ds <= @right_date")
+                 .groupby(ts_id_columns)["sales"]
+                 .sum()
+                 .reset_index())
+    total = weights_df.sales.sum()
+    weights_df["weight"] = weights_df.eval("sales/@total")
+    weights_df.drop("sales", axis=1, inplace=True)
+    
+    return weights_df
+
+def compute_all_weights(weighting_input, start_date):
+    weights_by_level = dict()
+    for level in range(1,13):
+        weights_by_level[level] = compute_weights(weighting_input, start_date, level)
+    return weights_by_level
 
 
 def find_out_of_stock(df, threshold=28):
