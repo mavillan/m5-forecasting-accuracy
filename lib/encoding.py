@@ -1,5 +1,6 @@
 import pandas as pd
 import category_encoders as ce
+from sklearn.base import BaseEstimator
 
 
 class HierarchicalEncoder(BaseEstimator):
