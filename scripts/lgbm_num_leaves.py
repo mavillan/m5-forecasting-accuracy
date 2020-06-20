@@ -25,10 +25,10 @@ from evaluation import _WRMSSEEvaluator, WRMSSEEvaluator, Evaluator, WRMSSEEvalu
 # logger setting
 ###########################################################################################
 
-if os.path.exists(f"../results/lgbm_feature_fraction.csv"):
-    logger = open(f"../results/lgbm_feature_fraction.csv", "a")
+if os.path.exists(f"../results/lgbm_num_leaves.csv"):
+    logger = open(f"../results/lgbm_num_leaves.csv", "a")
 else:
-    logger = open(f"../results/lgbm_feature_fraction.csv", "w")
+    logger = open(f"../results/lgbm_num_leaves.csv", "w")
     logger.write("trial;params;wrmsse;wrmsseL12;error\n")
 
 ###########################################################################################
