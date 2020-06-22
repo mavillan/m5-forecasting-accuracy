@@ -45,23 +45,42 @@ def reduce_mem_usage(df, verbose=False):
         print('Mem. usage decreased to {:5.2f} Mb ({:.1f}% reduction)'.format(end_mem, 100 * (start_mem - end_mem) / start_mem))
     return df
 
+def compute_scaling(scaling_input, start_date=None, level=12):
+    if start_date is not None:
+        scaling_input = scaling_input.query("date < @start_date")
+    
+    if level==1:
+        _scaling_input = (
+            scaling_input
+            .groupby(["date"])["q"]
+            .sum()
+            .reset_index())
+        return pd.DataFrame([np.sqrt(np.nanmean(_scaling_input.q.diff(1)**2))], columns=["s"])
 
-def compute_scaling(data, cut_date=None, agg_columns="ts_id"):
-    if cut_date is not None:
-        data = data.query("date < @cut_date")
-    _data = (data
-             .groupby(agg_columns+["date"])["q"]
-             .sum()
-             .reset_index())
-    scaling = (_data.groupby(agg_columns)["q"]
-               .apply(lambda x: np.sqrt(np.nanmean(x.diff(1)**2)))
-               .reset_index())
+    ts_id_columns = ts_id_columns_by_level[level]
+    _scaling_input = (
+        scaling_input
+        .groupby(ts_id_columns+["date"])["q"]
+        .sum()
+        .reset_index())
+    scaling = (
+        _scaling_input.groupby(ts_id_columns)["q"]
+        .apply(lambda x: np.sqrt(np.nanmean(x.diff(1)**2)))
+        .reset_index()
+        .rename({"q":"s"}, axis=1))
     return scaling
 
+def compute_scales_by_level(scaling_input, start_date):
+    scales_by_level = dict()
+    for level in range(1,13):
+        scales_by_level[level] = compute_scaling(scaling_input, start_date, level)
+    return scales_by_level
 
 def compute_weights(weighting_input, start_date, level=12):
     if level==1:
         return None
+    if not isinstance(start_date, pd._libs.tslibs.timestamps.Timestamp):
+        start_date = pd.to_datetime(start_date)
     
     left_date = start_date - pd.DateOffset(days=28)
     right_date = start_date - pd.DateOffset(days=1)
@@ -78,12 +97,11 @@ def compute_weights(weighting_input, start_date, level=12):
     
     return weights_df
 
-def compute_all_weights(weighting_input, start_date):
+def compute_weights_by_level(weighting_input, start_date):
     weights_by_level = dict()
     for level in range(1,13):
         weights_by_level[level] = compute_weights(weighting_input, start_date, level)
     return weights_by_level
-
 
 def find_out_of_stock(df, threshold=28):
     df = df.copy()

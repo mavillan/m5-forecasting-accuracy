@@ -99,29 +99,35 @@ class WRMSSEEvaluatorL12(object):
     
 
 class WRMSSEEvaluator(object):
-    def __init__(self, valid_dataframe):
+    def __init__(self, valid_dataframe, weights_by_level=None, scales_by_level=None, single_store=False):
         self.valid_dataframe = valid_dataframe
+        self.weights_by_level = weights_by_level if weights_by_level is None else weights_by_level
+        self.scales_by_level = scales_by_level if scales_by_level is None else scales_by_level
+        self.single_store = single_store
     
     def _evaluate(self, predictions):
         valid_dataframe = self.valid_dataframe.copy()
         valid_dataframe["ypred"] = predictions
         errors_by_level = dict()
         
-        # computation for level1
-        scales = scales_by_level[1]
-        mse = (valid_dataframe
-               .groupby(["ds"])[["y","ypred"]]
-               .sum()
-               .reset_index()
-               .eval("(y-ypred)**2")
-               .mean())
-        errors_by_level["root"] = np.sqrt(mse)/scales.s[0]
+        if not self.single_store: 
+            levels_to_iterate = range(2,13)
+            # computation for level1
+            scales = self.scales_by_level[1]
+            mse = (valid_dataframe
+                .groupby(["ds"])[["y","ypred"]]
+                .sum()
+                .reset_index()
+                .eval("(y-ypred)**2")
+                .mean())
+            errors_by_level["root"] = np.sqrt(mse)/scales.s[0]
+        else:
+            levels_to_iterate = [3,8,9,12]
         
-        # computation for levels 2 to 12
-        for level in range(2,13):
+        for level in levels_to_iterate:
             ts_id_columns = ts_id_columns_by_level[level]
-            scales_dataframe = scales_by_level[level]
-            weights_dataframe = weights_by_level[level]
+            scales_dataframe = self.scales_by_level[level]
+            weights_dataframe = self.weights_by_level[level]
             error = (valid_dataframe
                      .groupby(["ds"]+ts_id_columns)[["y","ypred"]]
                      .sum()
@@ -146,9 +152,14 @@ class WRMSSEEvaluator(object):
     
 
 class Evaluator(object):
-    def __init__(self, valid_dataframe):
-        self.eval1 = WRMSSEEvaluatorL12(valid_dataframe)
-        self.eval2 = WRMSSEEvaluator(valid_dataframe)
+    def __init__(self, valid_dataframe, weights_by_level=None, scales_by_level=None, single_store=False):
+        self.valid_dataframe = valid_dataframe
+        self.weights_by_level = weights_by_level if weights_by_level is None else weights_by_level
+        self.scales_by_level = scales_by_level if scales_by_level is None else scales_by_level
+        self.single_store = single_store
+        
+        self.eval1 = WRMSSEEvaluator(valid_dataframe, weights_by_level, scales_by_level, single_store)
+        self.eval2 = WRMSSEEvaluatorL12(valid_dataframe, weights_by_level[12], scales_by_level[12])
     
     def evaluate(self, ypred, dtrain):
         return [self.eval1.evaluate(ypred, dtrain), self.eval2.evaluate(ypred, dtrain)]
