@@ -22,6 +22,8 @@ from utils import (compute_scaling, compute_weights, reduce_mem_usage,
 from evaluation import _WRMSSEEvaluator, WRMSSEEvaluator, Evaluator, WRMSSEEvaluatorL12
 from encoding import HierarchicalEncoder
 
+tic = time.time()
+
 ###########################################################################################
 # logger setting
 ###########################################################################################
@@ -241,3 +243,6 @@ search_space = {
 study = optuna.create_study(direction='minimize', sampler=optuna.samplers.GridSampler(search_space))
 study.optimize(objective, n_trials=6)
 logger.close()
+
+tac = time.time()
+print(f"total elapsed time: { (tac-tic)/3600. } [hrs].")
