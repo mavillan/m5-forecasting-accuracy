@@ -171,8 +171,8 @@ def objective(trial):
 
         valid_start = valid_period[0]
         valid_end = valid_period[1]
-        scales_level12 = all_scales[i]
-        weights_level12 = all_weights[i]
+        scales_by_level = all_scales[i]
+        weights_by_level = all_weights[i]
 
         stores_forecast = list()
         for store_id in range(1,11):
@@ -222,7 +222,7 @@ def objective(trial):
         mrg = pd.merge(data.loc[:, ["ds","item_id","dept_id","cat_id","store_id","state_id","y"]],
                        fold_forecast, how="inner", on=["ds","item_id","store_id"])
         evaluator = WRMSSEEvaluator(mrg.loc[:, ["ds","item_id","dept_id","cat_id","store_id","state_id","y"]], 
-                                    weight_by_level, scales_by_level)
+                                    weights_by_level, scales_by_level)
         
         wrmsse = evaluator._evaluate(mrg.y_pred.values)
         wrmsse_list.append(wrmsse)
