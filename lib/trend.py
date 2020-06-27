@@ -18,7 +18,8 @@ class TrendEstimator():
     
     def fit(self, data):
         if self.drop_last_n is not None: 
-            data = data.iloc[:-self.drop_last_n, :]
+            if self.drop_last_n > 0:
+                data = data.iloc[:-self.drop_last_n].copy() 
         min_date = data.ds.min()
         time_idx = (data.ds - min_date).apply(lambda x: x.days).values
         time_values = data.y.values
