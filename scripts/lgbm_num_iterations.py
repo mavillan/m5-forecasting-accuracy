@@ -69,15 +69,15 @@ default_model_params = {
     'objective':'tweedie',
     'tweedie_variance_power': 1.1,
     'metric':'None',
-    #'num_iterations':800,
+    #'num_iterations':500,
     #'early_stopping_rounds':300,
     'max_bin': 127,
-    'bin_construct_sample_cnt':6000000,
+    'bin_construct_sample_cnt':15000000,
     'num_leaves': 2**10-1,
     'min_data_in_leaf': 2**10-1,
     'learning_rate': 0.05, 
-    'feature_fraction': 0.7,
-    'bagging_fraction':0.9,
+    'feature_fraction': 0.8,
+    'bagging_fraction':0.7,
     'bagging_freq':1,
     'lambda_l2':0.1,
     'seed':7,
@@ -104,20 +104,6 @@ time_features = [
 
 exclude_features = [
     "ts_id",
-    "event_type_1",
-    "event_name_2",
-    "event_type_2",
-    
-    "prev_newyear",
-    "post_newyear",
-    "lw_day",
-    "lw_type",
-    "prev_lw",
-    "post_lw",
-    "post_christmas",
-    "prev_thanksgiving",
-    "post_thanksgiving",
-    
     "no_stock_days",
     "sales",
 ]
@@ -132,31 +118,47 @@ categorical_features = {
     "event_name_1": "default",
     }
 
+@numba.jit(nopython=True, nogil=True, fastmath=True)
+def compute_nzeros(x):
+    return np.sum(x==0)
+
+@numba.jit(nopython=True, nogil=True, fastmath=True)
+def compute_czeros(x):
+    return np.sum(np.cumprod((x==0)[::-1]))/x.shape[0]
+
+@numba.jit(nopython=True, nogil=True, fastmath=True)
+def compute_sfreq(x):
+    return np.sum(x!=0)/x.shape[0]
+
 model_kwargs = {
-    #"model_params":model_params,
+    "model_params":model_params,
     "time_features":time_features,
-    #"lags": list(range(1,15)),
-    "window_shifts":[1,7,28,56],
-    "window_functions":["mean","median","std","kurt",],
-    "window_sizes":[7,28],
+    "window_functions":{
+        "mean":   (None, [1,7,28], [7,14,21,28]),
+        "median": (None, [1,7,14,28], [7,]),
+        "std":    (None, [1,7,28], [7,28]),
+        "kurt":   (None, [1,7,28], [7,28]),
+        "czeros": (compute_czeros, [1,], [7,14,21,28,56]),
+        "sfreq":  (compute_sfreq, [1,],  [7,14,21,28]),
+    },
     "exclude_features":exclude_features,
     "categorical_features":categorical_features,
     "ts_uid_columns":["item_id","store_id"],
 }
 
-lagged_features = list()
+lagged_features_to_dropna = list()
 if "lags" in model_kwargs.keys():
     lag_features = [f"lag{lag}" for lag in model_kwargs["lags"]]
-    lagged_features.extend(lag_features)
+    lagged_features_to_dropna.extend(lag_features)
 if "window_functions" in model_kwargs.keys():
-    rw_features = [f"{window_func}{window_size}_shift{window_shift}" 
-                   for window_func in model_kwargs["window_functions"]
-                   for window_size in model_kwargs["window_sizes"]
-                   for window_shift in model_kwargs["window_shifts"]]
-    lagged_features.extend(rw_features)
-    
-lagged_features_to_dropna = list(filter(lambda x: "skew" not in x, lagged_features))
-lagged_features_to_dropna = list(filter(lambda x: "kurt" not in x, lagged_features_to_dropna))
+    rw_features = list()
+    for window_func,window_def in model_kwargs["window_functions"].items():
+        _,window_shifts,window_sizes = window_def
+        if window_func in ["mean","median","std","min","max"]:
+            rw_features.extend([f"{window_func}{window_size}_shift{window_shift}"
+                                for window_size in window_sizes
+                                for window_shift in window_shifts])
+    lagged_features_to_dropna.extend(rw_features)
 
 ###########################################################################################
 # definition of objective
