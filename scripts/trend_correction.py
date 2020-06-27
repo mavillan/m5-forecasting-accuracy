@@ -140,20 +140,26 @@ for fold in range(4):
 def objective(trial):
     pbw_min1 = trial.suggest_int("pbw_min1", 14, 42)
     pbw_max1 = trial.suggest_int("pbw_max1", pbw_min1+2, 56)
+    mbw1 = trial.suggest_int("mbw1", 14, 56)
+    fbw1 = trial.suggest_int("fbw1", 14, 56)
+    alpha1 = trial.suggest_int("alpha1", 0, 10)
     kwargs1 = {
         "primary_bandwidths" : np.arange(pbw_min1, pbw_max1),
-        "middle_bandwidth": trial.suggest_int("mbw1", 14, 56),
-        "final_bandwidth": trial.suggest_int("fbw1", 14, 56),
-        "alpha": trial.suggest_int("alpha1", 0, 10),
+        "middle_bandwidth": mbw1,
+        "final_bandwidth": fbw1,
+        "alpha": alpha1,
     }
     
     pbw_min2 = trial.suggest_int("pbw_min2", 28, 112)
     pbw_max2 = trial.suggest_int("pbw_max2", pbw_min2+2, 168)
+    mbw2 = trial.suggest_int("mbw2", 28, 168)
+    fbw2 = trial.suggest_int("fbw2", 28, 168)
+    alpha2 = trial.suggest_int("alpha2", 0, 10)
     kwargs2 = {
         "primary_bandwidths" : np.arange(pbw_min2, pbw_max2),
-        "middle_bandwidth": trial.suggest_int("mbw2", 28, 168),
-        "final_bandwidth": trial.suggest_int("fbw2", 28, 168),
-        "alpha": trial.suggest_int("alpha2", 0, 10),
+        "middle_bandwidth": mbw2,
+        "final_bandwidth": fbw2,
+        "alpha": alpha2,
     }
 
     errors = list()
@@ -173,8 +179,18 @@ def objective(trial):
                                  kwargs1=kwargs1, 
                                  kwargs2=kwargs2)
         errors.append(error)
-        
-    params = {"kwargs1":kwargs1, "kwargs2":kwargs2}
+            
+    params = {
+        "pbw_min1":pbw_min1,
+        "pbw_max1":pbw_max1,
+        "mbw1":mbw1,
+        "fbw1":fbw1,
+        "alpha1":alpha1,
+        "pbw_min2":pbw_min2,
+        "pbw_max2":pbw_max2,
+        "mbw2":mbw2,
+        "fbw2":fbw2,
+        "alpha2":alpha2,}
     mean_error = np.mean(errors)
     print(f"{params};{errors};{mean_error}")
 
