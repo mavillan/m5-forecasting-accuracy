@@ -9,13 +9,16 @@ def trimean(array, axis=0):
 
 class TrendEstimator():
     
-    def __init__(self, primary_bandwidths, middle_bandwidth, final_bandwidth, alpha):
+    def __init__(self, primary_bandwidths, middle_bandwidth, final_bandwidth, alpha, drop_last_n=None):
         self.primary_bandwidths = primary_bandwidths
         self.middle_bandwidth = middle_bandwidth
         self.final_bandwidth = final_bandwidth
         self.alpha = alpha
+        self.drop_last_n = drop_last_n
     
     def fit(self, data):
+        if self.drop_last_n is not None: 
+            data = data.iloc[:-self.drop_last_n, :]
         min_date = data.ds.min()
         time_idx = (data.ds - min_date).apply(lambda x: x.days).values
         time_values = data.y.values
