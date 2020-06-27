@@ -143,11 +143,13 @@ def objective(trial):
     mbw1 = trial.suggest_int("mbw1", 14, 56)
     fbw1 = trial.suggest_int("fbw1", 14, 56)
     alpha1 = trial.suggest_int("alpha1", 0, 10)
+    drop_last_n = trial.suggest_int("drop_last_n", 0, 14)
     kwargs1 = {
         "primary_bandwidths" : np.arange(pbw_min1, pbw_max1),
         "middle_bandwidth": mbw1,
         "final_bandwidth": fbw1,
         "alpha": alpha1,
+        "drop_last_n": drop_last_n,
     }
     
     pbw_min2 = trial.suggest_int("pbw_min2", 28, 112)
@@ -186,6 +188,7 @@ def objective(trial):
         "mbw1":mbw1,
         "fbw1":fbw1,
         "alpha1":alpha1,
+        "drop_last_n":drop_last_n,
         "pbw_min2":pbw_min2,
         "pbw_max2":pbw_max2,
         "mbw2":mbw2,
