@@ -1,5 +1,6 @@
 import os
 import gc
+import copy
 import time
 import numpy as np; np.random.seed(42)
 import pandas as pd
@@ -7,6 +8,7 @@ import lightgbm as lgb
 import category_encoders as ce
 import matplotlib.pyplot as plt
 import optuna
+import numba
 
 from tsforest.forecaster import LightGBMForecaster
 from tsforest.utils import make_time_range
@@ -24,7 +26,7 @@ from encoding import HierarchicalEncoder
 # selection of fold
 ###########################################################################################
 
-FOLD = 3
+FOLD = 4
 
 ###########################################################################################
 # logger setting
@@ -74,12 +76,11 @@ default_model_params = {
     'max_bin': 127,
     'bin_construct_sample_cnt':15000000,
     'num_leaves': 2**10-1,
-    'min_data_in_leaf': 2**10-1,
-    'learning_rate': 0.05, 
-    'feature_fraction': 0.8,
-    'bagging_fraction':0.7,
+    'min_data_in_leaf': 2**11-1,
+    'learning_rate': 0.03, 
+    'feature_fraction': 0.9,
+    'bagging_fraction':0.66,
     'bagging_freq':1,
-    'lambda_l2':0.1,
     'seed':7,
     'boost_from_average': False,
     'first_metric_only': True,
@@ -131,7 +132,6 @@ def compute_sfreq(x):
     return np.sum(x!=0)/x.shape[0]
 
 model_kwargs = {
-    "model_params":model_params,
     "time_features":time_features,
     "window_functions":{
         "mean":   (None, [1,7,28], [7,14,21,28]),
@@ -164,27 +164,29 @@ if "window_functions" in model_kwargs.keys():
 # definition of objective
 ###########################################################################################
 
+valid_start = valid_period[0]
+valid_end = valid_period[1]
+_train_data = data.query("ds < @valid_start").reset_index(drop=True)
+
+print("Building the features")
+tic = time.time()
+model_level12_base = LightGBMForecaster(**model_kwargs)
+model_level12_base.prepare_features(train_data=_train_data)
+model_level12_base.train_features.dropna(subset=lagged_features_to_dropna, axis=0, inplace=True)
+model_level12_base.train_features = reduce_mem_usage(model_level12_base.train_features)
+tac = time.time()
+print(f"Elapsed time: {(tac-tic)/60.} [min]")
+
+ts_id_in_train = model_level12_base.train_features.ts_id.unique()
+valid_data = data.query("@valid_start <= ds <= @valid_end & ts_id in @ts_id_in_train")
+evaluator = Evaluator(valid_data, weights_by_level, scales_by_level)
+    
+
 def objective(trial):
-    sampled_params = {"num_iterations": trial.suggest_int("num_iterations", 200, 1000)}
+    sampled_params = {"num_iterations": trial.suggest_int("num_iterations", 500, 1500)}
     model_params = {**default_model_params, **sampled_params}
-    model_kwargs["model_params"] = model_params
-
-    valid_start = valid_period[0]
-    valid_end = valid_period[1]
-    _train_data = data.query("ds < @valid_start").reset_index(drop=True)
-
-    print("Building the features")
-    tic = time.time()
-    model_level12 = LightGBMForecaster(**model_kwargs)
-    model_level12.prepare_features(train_data=_train_data)
-    model_level12.train_features.dropna(subset=lagged_features_to_dropna, axis=0, inplace=True)
-    model_level12.train_features = reduce_mem_usage(model_level12.train_features)
-    tac = time.time()
-    print(f"Elapsed time: {(tac-tic)/60.} [min]")
-
-    ts_id_in_train = model_level12.train_features.ts_id.unique()
-    valid_data = data.query("@valid_start <= ds <= @valid_end & ts_id in @ts_id_in_train")
-    evaluator = Evaluator(valid_data, weights_by_level, scales_by_level)
+    model_level12 = copy.deepcopy(model_level12_base)
+    model_level12.set_params(model_params)
 
     print("Fitting the model")
     tic = time.time()
@@ -202,8 +204,10 @@ def objective(trial):
     print("wrmsse:", wrmsse)
     
     logger.write(f"{trial.number};{sampled_params};{evaluator.eval1.errors_by_level};{wrmsse}\n")
+    logger.flush()
     
-    del model_level12, _train_data, valid_data, evaluator
+    del model_level12
+    gc.collect()
     
     return wrmsse
 
@@ -211,7 +215,7 @@ def objective(trial):
 # study definition
 ###########################################################################################
 search_space = {
-    'num_iterations': [200,400,600,800,1000],
+    'num_iterations': [500,750,1000,1250,1500],
     }
 study = optuna.create_study(direction='minimize', sampler=optuna.samplers.GridSampler(search_space))
 study.optimize(objective, n_trials=5)
