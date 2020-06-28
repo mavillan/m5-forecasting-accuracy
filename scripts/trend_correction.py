@@ -38,14 +38,12 @@ ts_id_columns_by_level = {
     12: ["item_id", "store_id"]
 }
 
-def trend_correction(data, predict_data, weights, scales, level, kwargs1, kwargs2):
+def trend_correction(data_agg, predict_data, weights, scales, level, kwargs1, kwargs2):
     ts_uid_columns = ts_id_columns_by_level[level]
-    data_agg = data.groupby(["ds"]+ts_uid_columns)[["y","y_pred"]].sum().reset_index()
     start_date = predict_data.ds.min()
     
     errors = list()
     ts_uid_values = data_agg.loc[:, ts_uid_columns].drop_duplicates()
-
     for _,row in ts_uid_values.iterrows():
         query_string = " & ".join([f"{col} == {value}" for col,value in row.iteritems()])
 
@@ -65,7 +63,6 @@ def trend_correction(data, predict_data, weights, scales, level, kwargs1, kwargs
         _df = (data_agg.query(query_string)
                .merge(trend1, on="ds", how="inner")
                .merge(trend2, on="ds", how="inner"))
-
         _df["correction"] = _df.eval("trend_x - trend_y")
 
         scale = scales.query(query_string).s.values[0]
@@ -125,13 +122,18 @@ fold_forecasts = [
 ]
 
 # input data by forecast
+ts_uid_columns = ts_id_columns_by_level[LEVEL]
 data_by_fold = list()
 for fold in range(4):
     end_date = valid_periods[fold][1]
     mrg = pd.merge(data.query("ds <= @end_date").loc[:, ["ds","item_id","dept_id","cat_id","store_id","state_id","y"]],
                    fold_forecasts[fold],
                    how="left", on=["ds","item_id","store_id"])
-    data_by_fold.append(mrg)
+    mrg_agg = mrg.groupby(["ds"]+ts_uid_columns)[["y","y_pred"]].sum().reset_index()
+    data_by_fold.append(mrg_agg)
+    
+del data, scaling_input, weighting_input, fold_forecasts
+gc.collect()
 
 ###########################################################################################
 # model config
