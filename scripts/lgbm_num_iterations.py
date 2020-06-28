@@ -71,16 +71,17 @@ default_model_params = {
     'objective':'tweedie',
     'tweedie_variance_power': 1.1,
     'metric':'None',
-    #'num_iterations':500,
+    #'num_iterations':800,
     #'early_stopping_rounds':300,
     'max_bin': 127,
-    'bin_construct_sample_cnt':15000000,
+    'bin_construct_sample_cnt':20000000,
     'num_leaves': 2**10-1,
-    'min_data_in_leaf': 2**11-1,
-    'learning_rate': 0.03, 
-    'feature_fraction': 0.9,
-    'bagging_fraction':0.66,
+    'min_data_in_leaf': 2**10-1,
+    'learning_rate': 0.05,
+    'feature_fraction':0.8,
+    'bagging_fraction':0.8,
     'bagging_freq':1,
+    'lambda_l2':0.1,
     'seed':7,
     'boost_from_average': False,
     'first_metric_only': True,
@@ -183,7 +184,7 @@ evaluator = Evaluator(valid_data, weights_by_level, scales_by_level)
     
 
 def objective(trial):
-    sampled_params = {"num_iterations": trial.suggest_int("num_iterations", 500, 1500)}
+    sampled_params = {"num_iterations": trial.suggest_int("num_iterations", 400, 900)}
     model_params = {**default_model_params, **sampled_params}
     model_level12 = copy.deepcopy(model_level12_base)
     model_level12.set_params(model_params)
@@ -215,8 +216,8 @@ def objective(trial):
 # study definition
 ###########################################################################################
 search_space = {
-    'num_iterations': [500,750,1000,1250,1500],
+    'num_iterations': [400,500,600,700,800,900],
     }
 study = optuna.create_study(direction='minimize', sampler=optuna.samplers.GridSampler(search_space))
-study.optimize(objective, n_trials=5)
+study.optimize(objective, n_trials=6)
 logger.close()
