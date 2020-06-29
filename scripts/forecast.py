@@ -37,10 +37,10 @@ def main(approach):
     # loads training data
     data = (pd.read_parquet("../input/train_dataframe.parquet")
             .rename({"q":"y"}, axis=1))
-    data["sales"] = data.eval("y * sell_price")
 
     # loads evaluation data
     eval_data = pd.read_parquet("../input/eval_dataframe.parquet")
+    eval_data["no_stock_days"] = None
 
     # model configuration
     model_params = {
