@@ -1,5 +1,6 @@
 import os
 import gc
+import copy
 import time
 import numba
 import numpy as np; np.random.seed(42)
