@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from tsforest.utils import make_time_range
 from supersmoother import SuperSmoother
 
 def trimean(array, axis=0):
