@@ -16,36 +16,6 @@ ts_id_columns_by_level = {
     12: ["item_id", "store_id"]
 }
 
-scales_by_level = {
-    1: pd.read_parquet("../input/scales_level1.parquet"),
-    2: pd.read_parquet("../input/scales_level2.parquet"),
-    3: pd.read_parquet("../input/scales_level3.parquet"),
-    4: pd.read_parquet("../input/scales_level4.parquet"),
-    5: pd.read_parquet("../input/scales_level5.parquet"),
-    6: pd.read_parquet("../input/scales_level6.parquet"),
-    7: pd.read_parquet("../input/scales_level7.parquet"),
-    8: pd.read_parquet("../input/scales_level8.parquet"),
-    9: pd.read_parquet("../input/scales_level9.parquet"),
-    10: pd.read_parquet("../input/scales_level10.parquet"),
-    11: pd.read_parquet("../input/scales_level11.parquet"),
-    12: pd.read_parquet("../input/scales_level12.parquet"),
-}
-
-weights_by_level = {
-    1: None,
-    2: pd.read_parquet("../input/weights_level2.parquet"),
-    3: pd.read_parquet("../input/weights_level3.parquet"),
-    4: pd.read_parquet("../input/weights_level4.parquet"),
-    5: pd.read_parquet("../input/weights_level5.parquet"),
-    6: pd.read_parquet("../input/weights_level6.parquet"),
-    7: pd.read_parquet("../input/weights_level7.parquet"),
-    8: pd.read_parquet("../input/weights_level8.parquet"),
-    9: pd.read_parquet("../input/weights_level9.parquet"),
-    10: pd.read_parquet("../input/weights_level10.parquet"),
-    11: pd.read_parquet("../input/weights_level11.parquet"),
-    12: pd.read_parquet("../input/weights_level12.parquet")
-}
-
 class _WRMSSEEvaluator(object):
     def __init__(self, valid_dataframe, weights_dataframe, scales_dataframe, ts_uid_columns):
         self.valid_dataframe = valid_dataframe

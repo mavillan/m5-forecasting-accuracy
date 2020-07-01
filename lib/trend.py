@@ -3,6 +3,21 @@ import pandas as pd
 from tsforest.utils import make_time_range
 from supersmoother import SuperSmoother
 
+ts_id_columns_by_level = {
+    1: [],
+    2: ["state_id"],
+    3: ["store_id"],
+    4: ["cat_id"],
+    5: ["dept_id"],
+    6: ["state_id", "cat_id"],
+    7: ["state_id", "dept_id"],
+    8: ["store_id", "cat_id"],
+    9: ["store_id", "dept_id"],
+    10: ["item_id"],
+    11: ["item_id", "state_id"],
+    12: ["item_id", "store_id"]
+}
+
 def trimean(array, axis=0):
     quantiles = np.percentile(array, [25, 50, 75], axis=axis)
     return (quantiles[0,:] + 2*quantiles[1,:] + quantiles[2,:])/4
@@ -43,21 +58,6 @@ class TrendEstimator():
         trend = self.trend_model.predict(time_idx)
         return pd.DataFrame({"ds":data.ds, "trend":trend})
 
-    
-ts_id_columns_by_level = {
-    1: [],
-    2: ["state_id"],
-    3: ["store_id"],
-    4: ["cat_id"],
-    5: ["dept_id"],
-    6: ["state_id", "cat_id"],
-    7: ["state_id", "dept_id"],
-    8: ["store_id", "cat_id"],
-    9: ["store_id", "dept_id"],
-    10: ["item_id"],
-    11: ["item_id", "state_id"],
-    12: ["item_id", "store_id"]
-}
 
 def apply_trend_correction(data, forecast, level, kwargs1, kwargs2):
     ts_uid_columns = ts_id_columns_by_level[level]
@@ -97,32 +97,24 @@ def apply_trend_correction(data, forecast, level, kwargs1, kwargs2):
         
     return pd.concat(corrected_dataframes, ignore_index=True)
 
-def trimean(array, axis=0):
-    quantiles = np.percentile(array, [25, 50, 75], axis=axis)
-    return (quantiles[0,:] + 2*quantiles[1,:] + quantiles[2,:])/4
 
 def apply_robust_trend_correction(data, forecast, level, kwargs_list):
     ts_uid_columns = ts_id_columns_by_level[level]
     start_date = forecast.ds.min()
     end_date = forecast.ds.max()
     predict_data = make_time_range(start_date, end_date, "D")
-    
-    mrg = pd.merge(data.query("ds <= @end_date").loc[:, ["ds","item_id","dept_id","cat_id","store_id","state_id","y"]],
-                   forecast,
-                   how="left", on=["ds","item_id","store_id"])
-    mrg_agg = mrg.groupby(["ds"]+ts_uid_columns)[["y","y_pred"]].sum().reset_index()
+        
+    mrg_agg = pd.concat([data.query("ds < @start_date").groupby(["ds"]+ts_uid_columns)["y"].sum().reset_index(),
+                         forecast.groupby(["ds"]+ts_uid_columns)["y_pred"].sum().reset_index().rename({"y_pred":"y"}, axis=1)],
+                        ignore_index=False)
     
     ts_uid_values = mrg_agg.loc[:, ts_uid_columns].drop_duplicates()
     corrected_dataframes = list()
     
     for _,row in ts_uid_values.iterrows():
         query_string = " & ".join([f"{col} == {value}" for col,value in row.iteritems()])
-
-        df = pd.concat([
-            mrg_agg.query(query_string + "& ds < @start_date").loc[:, ["ds","y"]],
-            mrg_agg.query(query_string + "& ds >= @start_date").loc[:, ["ds","y_pred"]].rename({"y_pred":"y"}, axis=1)],
-            ignore_index=True)
-
+        df = mrg_agg.query(query_string).copy()
+        
         all_corrections = list()
         for kwargs1,kwargs2 in kwargs_list:
             trend_model1 = TrendEstimator(**kwargs1)
@@ -137,7 +129,8 @@ def apply_robust_trend_correction(data, forecast, level, kwargs_list):
 
         trend_correction = trimean(all_corrections, axis=0)
         _df = mrg_agg.query(query_string + "& @start_date <= ds <= @end_date").copy()
-        _df["y_pred"] -= trend_correction
-        corrected_dataframes.append(_df.loc[:, ["ds","store_id","y_pred"]])
+        _df["y"] -= trend_correction
+        _df.rename({"y":"y_pred"}, axis=1, inplace=True)
+        corrected_dataframes.append(_df.loc[:, ["ds"]+ts_uid_columns+["y_pred"]])
         
     return pd.concat(corrected_dataframes, ignore_index=True)
